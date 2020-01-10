@@ -1,8 +1,9 @@
 #Import libraries
 from selenium import webdriver
-import pandas as pd
 import time
 import scrDefine
+import json
+import csv
 
 # Initialize ChromeDriver
 # Load web page for selected country
@@ -97,41 +98,75 @@ def _funcReloadNonAvailibilityDataFrom2010(driver):
         except:
             time.sleep(3)
 
-
 # parse table record click on next tab button
 # loop, loop, loop are required.
 def _funcParseNonAvailibiltyData(driver):
-    divTable = driver.find_element_by_id('c2220')
-    divRecord = divTable.find_element_by_class_name('mv-records-panel')
-    arrDataBody = divRecord.find_elements_by_tag_name('tbody')[0]
-    arrDataRows = arrDataBody.find_elements_by_tag_name('tr')
-
     parseResult = []
+    LstPageNumbers = []
 
-    for row in arrDataRows:
-        arrTdRecords = row.find_elements_by_tag_name('td')
+    bIsMorePage = True
 
-        cols = ['','','','','','','','','','','']
-        for i in range(len(arrTdRecords)):
-            if i == 0:
-                continue
-            if i == 1:
-                rec = arrTdRecords[1]
-                cols[0] = rec.find_elements_by_tag_name('div')[0].text
-                continue
-            rec = arrTdRecords[i]
-            cols[i-1] = rec.text;
+    while bIsMorePage:
+        bIsMorePage = False
+        divTable = driver.find_element_by_id('c2220')
+        divRecPages = divTable.find_element_by_xpath(".//div[contains(@class,'mv-record-pages')]")
+        divBtnPages = divRecPages.find_elements_by_tag_name('div')
 
-        parseOneRec = pd.DataFrame(
-            {"Market Participant-Affected Asset-Affected Unit": [cols[0]], "Bidding Zone": [cols[1]], "Fuel Type": [cols[2]], "Event Start": [cols[3]],
-             "Event Stop": [cols[4]], "Unavailable Capacity(MW)": [cols[5]], "Reason": [cols[6]], "Status": [cols[7]],
-             "Message ID": [cols[8]], "Publication date/time":[cols[9]]})
+        for divPage in divBtnPages:
+            if divPage.text not in LstPageNumbers:
+                LstPageNumbers.append(divPage.text)
+                bIsMorePage = True
 
-        parseResult = parseResult.append(parseOneRec, ignore_index=True, sort=False)
+                # change page number
+                divPage.click()
+                time.sleep(2)
+
+                # parse it
+                divRecord = divTable.find_element_by_class_name('mv-records-panel')
+                arrDataBody = divRecord.find_elements_by_tag_name('tbody')[0]
+                arrDataRows = arrDataBody.find_elements_by_tag_name('tr')
+
+                for row in arrDataRows:
+                    arrTdRecords = row.find_elements_by_tag_name('td')
+
+                    cols = ['','','','','','','','','','','']
+                    for i in range(len(arrTdRecords)):
+                        if i == 0 or i == 8:
+                            continue
+                        if i == 1:
+                            rec = arrTdRecords[1]
+                            cols[0] = rec.find_elements_by_tag_name('div')[0].text
+                            continue
+                        rec = arrTdRecords[i]
+                        if i < 8:
+                            cols[i-1] = rec.text;
+                        elif i > 8:
+                            cols[i-2] = rec.text;
+
+                    parseOneRec = {}
+                    parseOneRec['Market Participant-Affected Asset-Affected Unit'] = cols[0]
+                    parseOneRec['Bidding Zone'] = cols[1]
+                    parseOneRec['Fuel Type'] = cols[2]
+                    parseOneRec['Event Start'] = cols[3]
+                    parseOneRec['Event Stop'] = cols[4]
+                    parseOneRec['Unavailable Capacity(MW)'] = cols[5]
+                    parseOneRec['Reason'] = cols[6]
+                    parseOneRec['Message ID'] = cols[7]
+                    parseOneRec['Publication date/time'] = cols[8]
+
+                    json_data = json.dumps(parseOneRec)
+                    parseResult.append(json_data)
+
+                # search for next page
+                break
 
     # print results to file
-    if parseResult is not None:
-        parseResult.to_csv('D:/result.csv')
+    if len(parseResult) > 0:
+        with open('D:/result.csv', 'wt') as csvfile:
+            for line in parseResult:
+                csvfile.write(line)
+                csvfile.write("\n")
+            print ("Operation Completed")
 
 # main function
 if __name__ == '__main__':
