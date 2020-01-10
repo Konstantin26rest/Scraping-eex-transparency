@@ -113,6 +113,12 @@ def _funcParseNonAvailibiltyData(driver):
         divBtnPages = divRecPages.find_elements_by_tag_name('div')
 
         for divPage in divBtnPages:
+            try:
+                svgElement = divPage.find_elements_by_tag_name('svg')[0]
+                continue
+            except:
+                pass
+
             if divPage.text not in LstPageNumbers:
                 LstPageNumbers.append(divPage.text)
                 bIsMorePage = True
