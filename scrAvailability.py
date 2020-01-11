@@ -110,17 +110,14 @@ def _funcParseNonAvailibiltyData(driver):
         bIsMorePage = False
         divTable = driver.find_element_by_id('c2220')
         divRecPages = divTable.find_element_by_xpath(".//div[contains(@class,'mv-record-pages')]")
-        divBtnPages = divRecPages.find_elements_by_tag_name('div')
+        divBtnPages = divRecPages.find_elements_by_class_name('mv-button')
 
+        curPageNumber = '0'
         for divPage in divBtnPages:
-            try:
-                svgElement = divPage.find_elements_by_tag_name('svg')[0]
-                continue
-            except:
-                pass
-
             if divPage.text not in LstPageNumbers:
                 LstPageNumbers.append(divPage.text)
+                curPageNumber = divPage.text
+
                 bIsMorePage = True
 
                 # change page number
@@ -166,13 +163,17 @@ def _funcParseNonAvailibiltyData(driver):
                 # search for next page
                 break
 
-    # print results to file
-    if len(parseResult) > 0:
-        with open('D:/result.csv', 'wt') as csvfile:
-            for line in parseResult:
-                csvfile.write(line)
-                csvfile.write("\n")
-            print ("Operation Completed")
+        # print results to file
+        if len(parseResult) > 0:
+            with open('D:/result' + curPageNumber + '.csv', 'wt') as csvfile:
+                for line in parseResult:
+                    csvfile.write(line)
+                    csvfile.write("\n")
+                print("Scraping of Page " + curPageNumber + " has completed.")
+        parseResult.clear()
+        parseResult = []
+
+    print ("Operation Completed")
 
 # main function
 if __name__ == '__main__':
