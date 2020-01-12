@@ -1,9 +1,8 @@
 #Import libraries
+import scrDefine
 from selenium import webdriver
 import time
-import scrDefine
 import json
-import csv
 
 # Initialize ChromeDriver
 # Load web page for selected country
@@ -188,9 +187,6 @@ if __name__ == '__main__':
 
     # parse None Availibility Data
     _funcParseNonAvailibiltyData(webdriver)
-
-    # sleep
-    time.sleep(60000)
 
     # driver close
     webdriver.close()
