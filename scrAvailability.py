@@ -2,7 +2,8 @@
 import scrDefine
 from selenium import webdriver
 import time
-import json
+import pymongo
+from datetime import datetime
 
 # Initialize ChromeDriver
 # Load web page for selected country
@@ -89,7 +90,7 @@ def _funcReloadNonAvailibilityDataFrom2010(driver):
     time.sleep(1)
     while 1:
         try:
-            divProbAvailable = driver.find_element_by_id('Production Availability')
+            divProbAvailable = driver.find_element_by_xpath("//*[@class='frame frame-default frame-type-text frame-layout-0']")
             divLoaded = divProbAvailable.find_element_by_class_name('loaded')
             divTable = divLoaded.find_element_by_class_name('mv-widget')
             time.sleep(1)
@@ -99,16 +100,17 @@ def _funcReloadNonAvailibilityDataFrom2010(driver):
 
 # parse table record click on next tab button
 # loop, loop, loop are required.
-def _funcParseNonAvailibiltyData(driver):
+def _funcParseNonAvailibiltyData(driver, i):
     parseResult = []
     LstPageNumbers = []
 
-    bIsMorePage = True
+    mycol = _funcGetConectionToMongoDB(i)
 
+    bIsMorePage = True
     while bIsMorePage:
         bIsMorePage = False
-        divTable = driver.find_element_by_id('c2220')
-        divRecPages = divTable.find_element_by_xpath(".//div[contains(@class,'mv-record-pages')]")
+        divProbAvailable = driver.find_element_by_xpath("//*[@class='frame frame-default frame-type-text frame-layout-0']")
+        divRecPages = divProbAvailable.find_element_by_xpath(".//div[contains(@class,'mv-record-pages')]")
         divBtnPages = divRecPages.find_elements_by_class_name('mv-button')
 
         curPageNumber = '0'
@@ -124,7 +126,7 @@ def _funcParseNonAvailibiltyData(driver):
                 time.sleep(2)
 
                 # parse it
-                divRecord = divTable.find_element_by_class_name('mv-records-panel')
+                divRecord = divProbAvailable.find_element_by_class_name('mv-records-panel')
                 arrDataBody = divRecord.find_elements_by_tag_name('tbody')[0]
                 arrDataRows = arrDataBody.find_elements_by_tag_name('tr')
 
@@ -156,28 +158,42 @@ def _funcParseNonAvailibiltyData(driver):
                     parseOneRec['Message ID'] = cols[7]
                     parseOneRec['Publication date/time'] = cols[8]
 
-                    json_data = json.dumps(parseOneRec)
-                    parseResult.append(json_data)
+                    # json_data = json.dumps(parseOneRec)
+                    # parseResult.append(json_data)
+                    parseResult.append(parseOneRec)
 
                 # search for next page
                 break
 
         # print results to file
         if len(parseResult) > 0:
-            with open('D:/result' + curPageNumber + '.csv', 'wt') as csvfile:
-                for line in parseResult:
-                    csvfile.write(line)
-                    csvfile.write("\n")
-                print("Scraping of Page " + curPageNumber + " has completed.")
+            for line in parseResult:
+                mycol.insert_one(line)
+            print("Scraping of Page " + curPageNumber + " has completed.")
         parseResult.clear()
         parseResult = []
 
     print ("Operation Completed")
 
+# get connection to appropriate database
+def _funcGetConectionToMongoDB(i):
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    mydb = myclient[scrDefine.AVAIL_DBNAMES[i]]
+
+    now = datetime.now()
+    colName = "DB" + now.strftime("%Y-%m-%d-%H-%M-%S")
+    mycol = mydb[colName]
+
+    return mycol
+
 # main function
 if __name__ == '__main__':
+    # Print Description to use
+    print ("0:Austria, 1:Belgium, 2:Czech Republic, 3:France, 4:Germany, 5:Great Britain, 6:Hungary, 7:Italy, 8:Netherlands, 9:Switzerland")
+    n = input("Press appropriate number to select country...\n")
+
     # load page
-    webdriver = _funcLoadWebPage(0)
+    webdriver = _funcLoadWebPage( int(n))
 
     # hide license agree dialog
     _funcHideAgreeTermsDialog(webdriver)
@@ -185,8 +201,8 @@ if __name__ == '__main__':
     # reset filter date to 2010/1/1
     _funcReloadNonAvailibilityDataFrom2010(webdriver)
 
-    # parse None Availibility Data
-    _funcParseNonAvailibiltyData(webdriver)
+    # parse None Availability Data
+    _funcParseNonAvailibiltyData(webdriver, int(n))
 
     # driver close
     webdriver.close()

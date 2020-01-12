@@ -3,7 +3,8 @@ import scrDefine
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 import time
-import json
+import pymongo
+from datetime import datetime
 
 # Initialize ChromeDriver
 # Load web page for selected country
@@ -75,6 +76,8 @@ def _funcParseFuelData(driver, i):
 
     parseResult = []
 
+    mycol = _funcGetConectionToMongoDB(i)
+
     for k in range(1, len(arrRecords)):
         record = arrRecords[k]
         arrColumns = record.find_elements_by_tag_name('td')
@@ -85,18 +88,28 @@ def _funcParseFuelData(driver, i):
         parseOneRec['Unit']     = arrColumns[2].text
         parseOneRec['Installed Capacity (MW)'] = arrColumns[3].text
 
-        json_data = json.dumps(parseOneRec)
-        parseResult.append(json_data)
+        # json_data = json.dumps(parseOneRec)
+        # parseResult.append(json_data)
+        parseResult.append(parseOneRec)
 
-    # save records to a file
+    # save records to mongodb
     # print results to file
     if len(parseResult) > 0:
-        with open('D:/result_' + scrDefine.LABELS[i] + '.txt', 'wt') as csvfile:
-            for line in parseResult:
-                csvfile.write(line)
-                csvfile.write("\n")
-            print("Scraping of Page " + scrDefine.LABELS[i] + " has completed.")
+        for line in parseResult:
+            mycol.insert_one(line)
+        print("Scraping of Page " + scrDefine.LABELS[i] + " has completed.")
     parseResult.clear()
+
+# get connection to appropriate database
+def _funcGetConectionToMongoDB(i):
+    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+    mydb = myclient[scrDefine.CAP_DBNAMES[i]]
+
+    now = datetime.now()
+    colName = "DB" + now.strftime("%Y-%m-%d-%H-%M-%S")
+    mycol = mydb[colName]
+
+    return mycol
 
 # main function
 if __name__ == '__main__':
